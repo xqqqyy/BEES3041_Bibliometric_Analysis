@@ -1,10 +1,8 @@
 ---
-title: "combine"
+title: "Qingyu_Xu_BEES3041"
 output: html_document
-date: "2023-07-17"
+date: "2023-07-27"
 ---
-
-
 ```{r}
 install.packages("ggthemes")
 install.packages("hrbrthemes")
@@ -38,8 +36,90 @@ library(circlize)
 bib <- convert2df("E:/Desktop/scopus.bib", dbsource = "scopus", format = "bibtex") # Convert to a bibliometric data frame
 names(bib)
 #write.csv(bib, "data/bib_as_df.csv", row.names = FALSE) #if you want to save this data frame as a csv file
+dim(bib)  # see how many dimensions in this data frame
 ```
 
+## The Most Productive Authors
+```{r}
+authors <- bib$AU
+authors <- unlist(strsplit(authors, ";"))
+authors <- authors[order(authors)]
+head(authors)
+```
+
+## Summarising bibliometric data
+```{r}
+results <- biblioAnalysis(bib_title_included, sep = ";")
+summary(object = results, k = 10, pause = TRUE) #display a series of summary tables
+
+dim(bib_title_included)
+```
+
+```{r}
+# Preliminary descriptive analyses using summary function
+results <- biblioAnalysis(bib_title_included, sep = ";")
+#summary(object = results, k = 10, pause = TRUE) #display a series of summary tables
+plot(results, k = 10, pause = TRUE) #this takes top 10 values from each table
+```
+
+# 1. Authors' Collaboration
+```{r}
+# Create a bibliographic network (collaboration network) using the "biblioNetwork" function
+# `NetMatrix` will store the resulting collaboration network
+NetMatrix <- biblioNetwork(bib, analysis = "collaboration", network = "authors", sep = ";")
+
+
+# Create a network plot for the collaboration network stored in `NetMatrix`
+# `net` will store the resulting network plot
+net <- networkPlot(NetMatrix, weighted = NULL, n = 20, Title = "Authors' collaborations", type = "fruchterman", size = 5, remove.multiple = TRUE, labelsize = 0.5)
+```
+
+# 2. Country Scientific Collaboration
+```{r}
+# Extract countries from the affiliations in the bibliographic data
+# The function `metaTagExtraction` is used to extract country information from the "AU_CO" field (affiliation) of the `bib` data.
+# The extracted country information will be separated by the semicolon `;`.
+bib <- metaTagExtraction(bib, Field = "AU_CO", sep = ";") #we need to extract countries from the affiliations first
+
+# Create a bibliographic network (collaboration network) based on countries
+# The function `biblioNetwork` is used to construct a network of collaborations among countries.
+# The resulting network will be stored in `NetMatrix`.
+NetMatrix <- biblioNetwork(bib, analysis = "collaboration", network = "countries", sep = ";")
+
+# Create a network plot for the collaboration network stored in `NetMatrix`
+# The function `networkPlot` is used to visualize the country collaboration network.
+# The resulting plot will be stored in the variable `net`.
+net <- networkPlot(NetMatrix, n = 20, Title = "Country Collaboration", type = "auto", size = TRUE, remove.multiple = FALSE, labelsize = 0.5)
+```
+
+# 3. Keyword co-occurrences
+```{r}
+# Create a bibliographic network based on co-occurrences of keywords
+# The function `biblioNetwork` is used to construct a network of co-occurrences among keywords in the `bib` data.
+# The resulting network will be stored in `NetMatrix`.
+NetMatrix <- biblioNetwork(bib, analysis = "co-occurrences", network = "keywords", sep = ";")
+
+
+# Create a network plot for the keyword co-occurrence network stored in `NetMatrix`
+# The function `networkPlot` is used to visualize the keyword co-occurrence network.
+# The resulting plot will be stored in the variable `net`.
+net <- networkPlot(NetMatrix, n = 20, Title = "Keyword co-occurance", type = "fruchterman", size = T, remove.multiple = FALSE, labelsize = 0.7, edgesize = 5)
+```
+
+# 4. Co-Word Analysis
+```{r}
+# Generate a conceptual structure (network) based on bibliographic data
+# The function `conceptualStructure` is used to create a network of conceptual relationships among items in the `bib` data.
+CS <- conceptualStructure(bib, field = "ID", minDegree = 20, k.max = 5, stemming = FALSE, labelsize = 10)
+```
+
+```{r}
+# Generate a conceptual structure (network) based on bibliographic data using keywords (DE - Descriptors)
+# The function `conceptualStructure` is used to create a network of conceptual relationships among items in the `bib` data based on their keywords (descriptors).
+CS <- conceptualStructure(bib, field = "DE", minDegree = 20, k.max = 2, stemming = FALSE, labelsize = 10)
+```
+
+# 5. Load Files From Rayyan
 ```{r}
 screened <- read.csv("E:/Desktop/articles.csv")
 names(screened) #you can see there are fewer columns in the exported file
@@ -67,6 +147,7 @@ dim(screened_included) #345 records
 screened_included %>% filter(grepl('scopus', url)) %>% nrow() # 342 records from Scopus have doi contained in their url string: screened_included$url
 ```
 
+# 6. Merge data frames by article titles
 ```{r}
 #before joining by title, need to tidy up titles
 
@@ -78,29 +159,22 @@ screened_included$TI2 <- str_to_upper(str_replace_all(screened_included$title,"[
 
 # The field 'TI2' will now be used for merging info from onto bib data frame
 bib_title <- left_join(bib, screened_included %>% dplyr::select(url, title, TI2, year, journal, labels), by = "TI2")
-table(is.na(bib_title$labels)) #346 records with labels, these were included in Rayyan
+table(is.na(bib_title$labels)) #232 records with labels, these were included in Rayyan
 
 #only keep rows with labels
 bib_title %>% filter(!is.na(labels)) -> bib_title_included
-dim(bib_title_included) #346 records included
+dim(bib_title_included) #232 records included
 table(bib_title_included$labels) 
 names(bib_title_included) #now we have bibliometric file with only included articles and with labels
 ```
 
-```{r}
-authors <- bib$AU
-authors <- unlist(strsplit(authors, ";"))
-authors <- authors[order(authors)]
-head(authors)
-```
-
+# 7. Offical Bibiliometric Analysis (using n = 232)
 ```{r}
 results <- biblioAnalysis(bib_title_included, sep = ";")
 summary(object = results, k = 10, pause = TRUE) #display a series of summary tables
 
 dim(bib_title_included)
 ```
-
 ```{r}
 # Preliminary descriptive analyses using summary function
 results <- biblioAnalysis(bib_title_included, sep = ";")
@@ -108,6 +182,7 @@ results <- biblioAnalysis(bib_title_included, sep = ";")
 plot(results, k = 10, pause = TRUE) #this takes top 10 values from each table
 ```
 
+# 8. Process manual labels from Rayyan
 ```{r}
 #create Field variable
 bib_title_included <- bib_title_included %>%          
@@ -178,17 +253,6 @@ table(bib_title_included$Other)
 ```
 
 ```{r}
-#create Areas variable
-bib_title_included <- bib_title_included %>%          
-         mutate(Areas = case_when(str_detect(labels, "International") ~ "International", 
-                               str_detect(labels, "Developed Areas" ) ~ "Developed Areas", 
-                               str_detect(labels, "Developing Areas" ) ~ "Developing Areas", 
-                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
-names(bib_title_included)
-table(bib_title_included$Areas)
-```
-
-```{r}
 #create Solution variable
 bib_title_included <- bib_title_included %>%          
          mutate(Solution = case_when(str_detect(labels, "solution") ~ "solution", 
@@ -196,7 +260,7 @@ bib_title_included <- bib_title_included %>%
 names(bib_title_included)
 table(bib_title_included$Solution)
 
-#create Solution-Policy variable
+#create Policy variable
 bib_title_included <- bib_title_included %>%          
          mutate(Policy = case_when(str_detect(labels, "Policy" ) ~ "Policy", 
                                TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
@@ -207,6 +271,18 @@ table(bib_title_included$Solution, bib_title_included$Policy)
 ```
 
 ```{r}
+#create Areas variable
+bib_title_included <- bib_title_included %>%          
+         mutate(Areas = case_when(str_detect(labels, "International") ~ "International", 
+                               str_detect(labels, "Developed Areas" ) ~ "Developed Areas", 
+                               str_detect(labels, "Developing Areas" ) ~ "Developing Areas", 
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Areas)
+```
+
+# 9. Make simple plots based on labels
+```{r}
 data <- data.frame(
   Category = c("Solution", "Unclear"),
   Count = c(152, 80)
@@ -215,10 +291,14 @@ data <- data.frame(
 # Calculate percentages for each category
 data$Percent <- data$Count / sum(data$Count) * 100
 
+#for manually setting fill colours
+my.cols <- (c("#87CEFA", "#C1FFC1")) 
+
 # Create the bar plot
 ggplot(data, aes(x = paste0(Percent, "%"), y = Count, fill = Category)) +
   geom_col(position = "dodge", width = 0.5) +
   geom_text(aes(label = Count), vjust = -0.5, size = 4, position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = my.cols) +
   labs(title = "Solution",
        x = "Percent",
        y = "Count")
@@ -234,29 +314,20 @@ data <- data.frame(
 # Calculate percentages for each category
 data$Percent <- data$Count / sum(data$Count) * 100
 
+#for manually setting fill colours
+my.cols <- (c("#B3EE3A", "#386CB0")) 
+
 # Create the bar plot
 ggplot(data, aes(x = paste0(Percent, "%"), y = Count, fill = Category)) +
   geom_col(position = "dodge", width = 0.5) +
   geom_text(aes(label = Count), vjust = -0.5, size = 4, position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = my.cols) +
   labs(title = "Policy",
        x = "Percent",
        y = "Count")
 ```
 
-```{r}
-# Calculate the count of each area
-area_counts <- table(bib_title_included$Areas)
-
-# Calculate percentages for each area
-area_percentages <- prop.table(area_counts) * 100
-
-area_colors <- c("#0072B2", "#009E73", "#56B4E9", "#3F48CC")
-
-labels_with_percentages <- sprintf("%s (%.1f%%)", names(area_counts), area_percentages)
-pie(area_counts, main = "Distribution of Areas", col = area_colors, labels = labels_with_percentages)
-
-```
-
+## 9.1 Plot field
 ```{r}
 # Combine all 12 fields into a single column and remove "unclear" values
 bib_title_included_long <- bib_title_included %>%
@@ -273,6 +344,123 @@ ggplot(bib_title_included_long, aes(x = Research_Field, fill = Category )) +
        y = "Article count") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+```{r}
+# Step 1: Mutate columns for each field
+bib_title_included <- bib_title_included %>%
+  mutate(
+    Field1 = case_when(str_detect(labels, "Terrestrial Natural Ecosystems and Biodiversity") ~ "Terrestrial Natural Ecosystems and Biodiversity",
+                       TRUE ~ "unclear"),
+    Field2 = case_when(str_detect(labels, "Economics and Social") ~ "Economics and Social",
+                       TRUE ~ "unclear"),
+    Field3 = case_when(str_detect(labels, "Environmental Governance") ~ "Environmental Governance",
+                       TRUE ~ "unclear"),
+    Field4 = case_when(str_detect(labels, "Health") ~ "Health",
+                       TRUE ~ "unclear"),
+    Field5 = case_when(str_detect(labels, "Environmental Accounting") ~ "Environmental Accounting",
+                       TRUE ~ "unclear"),
+    Field6 = case_when(str_detect(labels, "Aquatic Ecosystems") ~ "Aquatic Ecosystems and Biodiversity",
+                       TRUE ~ "unclear"),
+    Field7 = case_when(str_detect(labels, "Big Data") ~ "Big Data",
+                       TRUE ~ "unclear"),
+    Field8 = case_when(str_detect(labels, "Energy") ~ "Energy",
+                       TRUE ~ "unclear"),
+    Field9 = case_when(str_detect(labels, "Atmospheric Science") ~ "Atmospheric Science",
+                       TRUE ~ "unclear"),
+    Field10 = case_when(str_detect(labels, "Agriculture") ~ "Agriculture",
+                        TRUE ~ "unclear"),
+    Field11 = case_when(str_detect(labels, "Other") ~ "Other",
+                        TRUE ~ "unclear")
+  )
+
+# Step 2: Combine the data for all fields
+combined_data <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field1_Count = sum(Field1 == "Terrestrial Natural Ecosystems and Biodiversity"),
+    Field2_Count = sum(Field2 == "Economics and Social"),
+    Field3_Count = sum(Field3 == "Environmental Governance"),
+    Field4_Count = sum(Field4 == "Health"),
+    Field5_Count = sum(Field5 == "Environmental Accounting"),
+    Field6_Count = sum(Field6 == "Aquatic Ecosystems and Biodiversity"),
+    Field7_Count = sum(Field7 == "Big Data"),
+    Field8_Count = sum(Field8 == "Energy"),
+    Field9_Count = sum(Field9 == "Atmospheric Science"),
+    Field10_Count = sum(Field10 == "Agriculture"),
+    Field11_Count = sum(Field11 == "Other")
+  )
+
+# Step 3: Create the plot
+combined_plot <- ggplot(combined_data, aes(x = year)) +
+  geom_col(aes(y = Field1_Count, fill = "Terrestrial Natural Ecosystems and Biodiversity"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field2_Count, fill = "Economics and Social"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field3_Count, fill = "Environmental Governance"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field4_Count, fill = "Health"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field5_Count, fill = "Environmental Accounting"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field6_Count, fill = "Aquatic Ecosystems and Biodiversity"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field7_Count, fill = "Big Data"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field8_Count, fill = "Energy"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field9_Count, fill = "Atmospheric Science"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field10_Count, fill = "Agriculture"), width = 0.7, position = "dodge") +
+  labs(x = "Year", y = "Article Count") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+# Display the plot
+print(combined_plot)
+
+
+library(ggplot2)
+library(dplyr)
+
+# Step 2: Combine the data for all fields
+combined_data <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field1_Count = sum(Field1 == "Terrestrial Natural Ecosystems and Biodiversity"),
+    Field2_Count = sum(Field2 == "Economics and Social"),
+    Field3_Count = sum(Field3 == "Environmental Governance"),
+    Field4_Count = sum(Field4 == "Health"),
+    Field5_Count = sum(Field5 == "Environmental Accounting"),
+    Field6_Count = sum(Field6 == "Aquatic Ecosystems and Biodiversity"),
+    Field7_Count = sum(Field7 == "Big Data"),
+    Field8_Count = sum(Field8 == "Energy"),
+    Field9_Count = sum(Field9 == "Atmospheric Science"),
+    Field10_Count = sum(Field10 == "Agriculture"),
+    Field11_Count = sum(Field11 == "Other")
+  )
+
+# Step 3: Create the plot
+combined_plot <- ggplot(combined_data, aes(x = as.factor(year))) +
+  geom_col(aes(y = Field1_Count, fill = "Terrestrial Natural Ecosystems and Biodiversity"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field2_Count, fill = "Economics and Social"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field3_Count, fill = "Environmental Governance"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field4_Count, fill = "Health"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field5_Count, fill = "Environmental Accounting"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field6_Count, fill = "Aquatic Ecosystems and Biodiversity"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field7_Count, fill = "Big Data"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field8_Count, fill = "Energy"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field9_Count, fill = "Atmospheric Science"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field10_Count, fill = "Agriculture"), width = 0.7, position = "dodge") +
+  geom_col(aes(y = Field11_Count, fill = "Other"), width = 0.7, position = "dodge") +
+  labs(x = "Year", y = "Article count", fill = "Discipline") +
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+# Display the plot
+print(combined_plot)
+```
+
 ```{r}
 bib_title_included %>%
   pivot_longer(cols = c(Environmental_Governance, Aquatic_Ecosystems, Environmental_Accounting, Agriculture, TNEB, Economics_Social, 
@@ -290,6 +478,301 @@ bib_title_included %>%
 ```
 
 ```{r}
+# Set the common plot width and height
+plot_width <- 6
+plot_height <- 4
+
+# Step 2: Combine the data for all fields
+combined_data1 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field2_Count = sum(Field2 == "Economics and Social"),
+    Field3_Count = sum(Field3 == "Environmental Governance"),
+    Field5_Count = sum(Field5 == "Environmental Accounting")
+  )
+
+# Step 3: Create the plot
+combined_plot2 <- ggplot(combined_data1, aes(x = year)) +
+  geom_line(aes(y = Field2_Count, color = "Economics and Social")) +
+  geom_line(aes(y = Field3_Count, color = "Environmental Governance")) +
+  geom_line(aes(y = Field5_Count, color = "Environmental Accounting")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Economics and Social" = "red",
+                                "Environmental Governance" = "blue",
+                                "Environmental Accounting" = "green")) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data3 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field7_Count = sum(Field7 == "Big Data"),
+    Field4_Count = sum(Field4 == "Health"),
+    Field8_Count = sum(Field8 == "Energy"),
+    Field11_Count = sum(Field11 == "Other")
+  )
+
+# Step 3: Create the plot
+combined_plot4 <- ggplot(combined_data3, aes(x = year)) +
+  geom_line(aes(y = Field7_Count, color = "Big Data")) +
+  geom_line(aes(y = Field4_Count, color = "Health")) +
+  geom_line(aes(y = Field8_Count, color = "Energy")) +
+  geom_line(aes(y = Field11_Count, color = "Other")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Big Data" = "darkgreen",
+                                "Health" = "steelblue",
+                                "Energy" = "darkorange",
+                                "Other" = "goldenrod")) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data2 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field1_Count = sum(Field1 == "Terrestrial Natural Ecosystems and Biodiversity"),
+    Field6_Count = sum(Field6 == "Aquatic Ecosystems and Biodiversity"),
+    Field9_Count = sum(Field9 == "Atmospheric Science"),
+    Field10_Count = sum(Field10 == "Agriculture")
+  )
+
+# Step 3: Create the plot
+combined_plot3 <- ggplot(combined_data2, aes(x = year)) +
+  geom_line(aes(y = Field1_Count, color = "Terrestrial Natural Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field6_Count, color = "Aquatic Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field9_Count, color = "Atmospheric Science")) +
+  geom_line(aes(y = Field10_Count, color = "Agriculture")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Terrestrial Natural Ecosystems and Biodiversity" = "#33a02c",
+                                "Aquatic Ecosystems and Biodiversity" = "#1f78b4",
+                                "Atmospheric Science" = "#e31a1c",
+                                "Agriculture" = "#fdbf6f")) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Combine and align the plots
+plot_grid(combined_plot2, combined_plot4, combined_plot3, ncol = 1, align = "v", rel_heights = rep(1, 3))
+```
+
+```{r}
+# Set the common plot width and height
+plot_width <- 6
+plot_height <- 20
+
+# Set the axis text size and legend text size
+axis_text_size <- 10
+legend_text_size <- 8
+
+# Step 2: Combine the data for all fields
+combined_data1 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field2_Count = sum(Field2 == "Economics and Social"),
+    Field3_Count = sum(Field3 == "Environmental Governance"),
+    Field5_Count = sum(Field5 == "Environmental Accounting")
+  )
+
+# Step 3: Create the plot
+combined_plot2 <- ggplot(combined_data1, aes(x = year)) +
+  geom_line(aes(y = Field2_Count, color = "Economics and Social")) +
+  geom_line(aes(y = Field3_Count, color = "Environmental Governance")) +
+  geom_line(aes(y = Field5_Count, color = "Environmental Accounting")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Economics and Social" = "red",
+                                "Environmental Governance" = "blue",
+                                "Environmental Accounting" = "green")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines")) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data3 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field7_Count = sum(Field7 == "Big Data"),
+    Field4_Count = sum(Field4 == "Health"),
+    Field8_Count = sum(Field8 == "Energy"),
+    Field11_Count = sum(Field11 == "Other")
+  )
+
+# Step 3: Create the plot
+combined_plot4 <- ggplot(combined_data3, aes(x = year)) +
+  geom_line(aes(y = Field7_Count, color = "Big Data")) +
+  geom_line(aes(y = Field4_Count, color = "Health")) +
+  geom_line(aes(y = Field8_Count, color = "Energy")) +
+  geom_line(aes(y = Field11_Count, color = "Other")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Big Data" = "darkgreen",
+                                "Health" = "steelblue",
+                                "Energy" = "darkorange",
+                                "Other" = "#EE1289")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines")) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data2 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field1_Count = sum(Field1 == "Terrestrial Natural Ecosystems and Biodiversity"),
+    Field6_Count = sum(Field6 == "Aquatic Ecosystems and Biodiversity"),
+    Field9_Count = sum(Field9 == "Atmospheric Science"),
+    Field10_Count = sum(Field10 == "Agriculture")
+  )
+
+# Step 3: Create the plot
+combined_plot3 <- ggplot(combined_data2, aes(x = year)) +
+  geom_line(aes(y = Field1_Count, color = "Terrestrial Natural Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field6_Count, color = "Aquatic Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field9_Count, color = "Atmospheric Science")) +
+  geom_line(aes(y = Field10_Count, color = "Agriculture")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Terrestrial Natural Ecosystems and Biodiversity" = "#33a02c",
+                                "Aquatic Ecosystems and Biodiversity" = "#1f78b4",
+                                "Atmospheric Science" = "#e31a1c",
+                                "Agriculture" = "#fdbf6f")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines"),
+        legend.box = "horizontal",
+        legend.title.align = 0.5) +
+  guides(color = guide_legend(title.position = "top", nrow = 2)) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+
+
+combined_plot2
+combined_plot4
+combined_plot3
+
+# Combine and align the plots
+#plot_grid(combined_plot2, combined_plot4, combined_plot3, ncol = 1, align = "v", #rel_heights = rep(1, 3), labels = c("Graph 1", "Graph 2", "Graph 3"))
+```
+
+```{r}
+# Set the common plot width and height
+plot_width <- 6
+plot_height <- 4
+
+# Set the axis text size and legend text size
+axis_text_size <- 10
+legend_text_size <- 8
+
+# Step 2: Combine the data for all fields
+combined_data1 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field2_Count = sum(Field2 == "Economics and Social"),
+    Field3_Count = sum(Field3 == "Environmental Governance"),
+    Field5_Count = sum(Field5 == "Environmental Accounting")
+  )
+
+# Step 3: Create the plot
+combined_plot2 <- ggplot(combined_data1, aes(x = year)) +
+  geom_line(aes(y = Field2_Count, color = "Economics and Social")) +
+  geom_line(aes(y = Field3_Count, color = "Environmental Governance")) +
+  geom_line(aes(y = Field5_Count, color = "Environmental Accounting")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Economics and Social" = "red",
+                                "Environmental Governance" = "blue",
+                                "Environmental Accounting" = "green")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines")) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data3 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field7_Count = sum(Field7 == "Big Data"),
+    Field4_Count = sum(Field4 == "Health"),
+    Field8_Count = sum(Field8 == "Energy"),
+    Field11_Count = sum(Field11 == "Other")
+  )
+
+# Step 3: Create the plot
+combined_plot4 <- ggplot(combined_data3, aes(x = year)) +
+  geom_line(aes(y = Field7_Count, color = "Big Data")) +
+  geom_line(aes(y = Field4_Count, color = "Health")) +
+  geom_line(aes(y = Field8_Count, color = "Energy")) +
+  geom_line(aes(y = Field11_Count, color = "Other")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Big Data" = "#EE1289",
+                                "Health" = "#27408B",
+                                "Energy" = "black",
+                                "Other" = "#9A32CD")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines")) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+# Step 2: Combine the data for all fields
+combined_data2 <- bib_title_included %>%
+  group_by(year) %>%
+  summarize(
+    Field1_Count = sum(Field1 == "Terrestrial Natural Ecosystems and Biodiversity"),
+    Field6_Count = sum(Field6 == "Aquatic Ecosystems and Biodiversity"),
+    Field9_Count = sum(Field9 == "Atmospheric Science"),
+    Field10_Count = sum(Field10 == "Agriculture")
+  )
+
+# Step 3: Create the plot
+combined_plot3 <- ggplot(combined_data2, aes(x = year)) +
+  geom_line(aes(y = Field1_Count, color = "Terrestrial Natural Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field6_Count, color = "Aquatic Ecosystems and Biodiversity")) +
+  geom_line(aes(y = Field9_Count, color = "Atmospheric Science")) +
+  geom_line(aes(y = Field10_Count, color = "Agriculture")) +
+  labs(x = "Year", y = "Article count", color = "Discipline") +
+  scale_color_manual(values = c("Terrestrial Natural Ecosystems and Biodiversity" = "#33a02c",
+                                "Aquatic Ecosystems and Biodiversity" = "#1f78b4",
+                                "Atmospheric Science" = "#CD5B45",
+                                "Agriculture" = "#fdbf6f")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = axis_text_size),
+        legend.text = element_text(size = legend_text_size),
+        legend.key.size = unit(2, "lines"),
+        legend.box = "horizontal",
+        legend.title.align = 1) +
+  coord_cartesian(clip = "off")  # Prevent clipping of legends
+
+
+# Set the common y-axis limits for all plots
+y_axis_limits <- c(0, max(max(combined_data1$Field2_Count), max(combined_data1$Field3_Count), max(combined_data1$Field5_Count), max(combined_data3$Field7_Count), max(combined_data3$Field4_Count), max(combined_data3$Field8_Count), max(combined_data3$Field11_Count), max(combined_data2$Field1_Count), max(combined_data2$Field6_Count), max(combined_data2$Field9_Count), max(combined_data2$Field10_Count)))
+
+# Apply the common y-axis limits to all plots
+combined_plot2 <- combined_plot2 + coord_cartesian(ylim = y_axis_limits)
+combined_plot4 <- combined_plot4 + coord_cartesian(ylim = y_axis_limits)
+combined_plot3 <- combined_plot3 + coord_cartesian(ylim = y_axis_limits)
+
+# Display the plots
+print(combined_plot2)
+print(combined_plot4)
+print(combined_plot3)
+
+# Combine and align the plots
+plot_grid(combined_plot2, combined_plot4, combined_plot3, ncol = 1, align = "v", rel_heights = rep(1, 3))
+```
+
+```{r}
+# Creat a pie chart with field 
 my_colors <- c("lightcyan","lightblue", "powderblue", "lightskyblue", "lightsteelblue", "royalblue1",
                "skyblue2", "slategray1", "steelblue4", "snow3", "slategray")
 
@@ -310,6 +793,67 @@ bib_title_included %>%
   geom_text(aes(label = scales::percent(Percentage)), position = position_stack(vjust = 0.5))
 ```
 
+## 9.1 Plot areas
+```{r}
+#calculate and sort by count
+count_levels <- bib_title_included11 %>%
+    count(levels) %>%
+    arrange(desc(n))
+
+#calculate percentages
+percent_levels <- count_levels %>%
+    mutate(percent = (n/sum(n)) * 100)
+
+#round percentages
+percent_levels$percent <- round(percent_levels$percent, digits = 0)
+
+#as factor and ordering for a nicer plot
+percent_levels$levels <- factor(percent_levels$levels,
+    level = percent_levels$levels[order(percent_levels$n, decreasing = TRUE)])
+
+#for manually setting fill colours
+my.cols <- (c("#BEAED4", "#FFFF99", "#386CB0")) 
+
+#make the plot
+ggplot(percent_levels, aes(x = levels, y = percent)) + 
+  geom_col(aes(fill = levels), width = 0.7) + 
+  geom_text(aes(label = percent), hjust = -0.2) + coord_flip() +
+  scale_y_continuous(name = "Percent (%)") + 
+  xlab("levels") + 
+  scale_fill_manual(values = my.cols) +
+  theme_classic() + 
+  theme(legend.position = "none")
+
+
+#Plot topic by year:
+
+bib_title_included11 %>%
+    count(year, levels) %>%
+    ggplot(aes(x = year, y = n, fill = levels)) + 
+    geom_col(width = 0.7) +
+    geom_text(position = position_stack(vjust = 0.5), aes(fill = levels, label = n)) + 
+    theme_classic() + 
+    labs(x = "Year", y = "Article count", fill = "Discipline") + 
+    theme(legend.position = "none", axis.title.x = element_text(size = 10))
+```
+
+```{r}
+# Calculate the count of each area
+area_counts <- table(bib_title_included$Areas)
+
+# Calculate percentages for each area
+area_percentages <- prop.table(area_counts) * 100
+
+area_colors <- c("#0072B2", "#009E73", "#56B4E9", "#3F48CC")
+
+labels_with_percentages <- sprintf("%s (%.1f%%)", names(area_counts), area_percentages)
+pie(area_counts, main = "Distribution of Areas", col = area_colors, labels = labels_with_percentages)
+
+```
+
+# 10. Make additional plots based on bibliometric information
+
+## 10.1 Keywords Worldcloud
 ```{r}
 bib2 <- biblioAnalysis(bib_title_included, sep = ";")
 S <- summary(object = bib2, k = 80, pause = FALSE) #only top 80 keywords
@@ -325,6 +869,7 @@ prob <- freq/sum(freq)
 wordcloud2(data.frame(words, prob), shuffle = TRUE, size = 1.5, color = "random-dark") 
 ```
 
+## 10.2 Countries Collaboration Plot
 ```{r}
 #using a bit different approach to get countries out
 bib3 <- metaTagExtraction(bib_title_included, Field = "AU_CO", sep = ";")
@@ -347,6 +892,8 @@ diag(small_matrix) <- 0  #get rid of collaboration with same country
 circos.clear() #prepare plotting area
 chordDiagramFromMatrix(small_matrix) #make the plot
 ```
+
+## 10.3 World Map
 
 ```{r}
 # Extract country information from the "AU_CO" 
@@ -390,12 +937,44 @@ emptymap
 ```
 
 ```{r}
-library(ggplot2)
+fullmap %>% 
+  ggplot(aes(fill = n, map_id = region)) +
+  geom_map(map = world_map, color = "white", size = 0.1) +  # Adding white borders around regions
+  expand_limits(x = world_map$long, y = world_map$lat) +
+  coord_map("moll") + # Mollweide projection
+  scale_fill_gradient(low = "#63B8FF", high = "#7A378B", na.value = "gray", name = "Value") +  # Customize gradient colors
+  guides(fill = guide_colourbar(title = "Legend Title")) +  # Add a title to the color scale legend
+  theme_map() +  # Using a simple theme for the map
+  labs(title = "World Map Showing Most Productive Countries",
+       subtitle = "2000-2023",
+       caption = "Data Source: Scopus") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10),
+        panel.background = element_rect(fill = "transparent", colour = NA),  # Setting white background
+        plot.background = element_rect(fill = "transparent", colour = NA))
+```
 
-# Assuming you have already loaded the required data and packages
-# fullmap <- ... (your data preparation)
-# world_map <- ... (your world map data)
+```{r}
+#formulate map showing publications by country
+map <- fullmap %>% 
+  ggplot(aes(fill = n, map_id = region)) +
+  geom_map(map = world_map) +
+  expand_limits(x = world_map$long, y = world_map$lat) + 
+  coord_map("moll") + 
+  theme_bw() +
+  theme(legend.position="bottom", axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), axis.title.x=element_blank(), 
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(), axis.title.y=element_blank(), plot.title = element_text(hjust = 0.5)) +
+   #scale_fill_viridis(direction=-1, option="viridis", breaks=c(50,100,150,200,250,300), limits = c(1, 60), guide = guide_colorbar(direction = "vertical.")) +
+  guides(fill = guide_colourbar(barwidth = unit(10, units = "cm"), barheight = unit(10, units = "mm"))) + labs(fill="Number of \nPublications", title = "Distribution of Publications by Countries")
+ 
+map #plot
+```
 
+```{r}
 fullmap %>% 
   ggplot(aes(fill = n, map_id = region)) +
   geom_map(map = world_map, color = "white", size = 0.1) +  # Adding white borders around regions
@@ -404,13 +983,13 @@ fullmap %>%
   scale_fill_gradient(low = "#63B8FF", high = "#FF6A6A", na.value = "gray", name = "Value", breaks = c(50, 100, 150, 200, 250, 300)) +  # Customize gradient colors and set breaks
   guides(fill = guide_colourbar(title = "Legend Title")) +  # Add a title to the color scale legend
   theme_map() +  # Using a simple theme for the map
-  labs(title = "World Map Showing Most Productive Countries",
+  labs(title = "Geographical Hotspots of Research Most Tempting to Policy Making",
        subtitle = "2000-2023",
        caption = "Data Source: Scopus") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
-        legend.title = element_text(size = 15, face = "bold"),
-        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10),
         panel.background = element_rect(fill = "transparent", colour = NA),  # Setting white background
         plot.background = element_rect(fill = "transparent", colour = NA))
 ```
