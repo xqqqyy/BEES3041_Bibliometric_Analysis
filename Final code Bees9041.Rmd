@@ -1,0 +1,417 @@
+---
+title: "combine"
+output: html_document
+date: "2023-07-17"
+---
+
+
+```{r}
+install.packages("ggthemes")
+install.packages("hrbrthemes")
+install.packages("migest")
+install.packages("circlize")
+```
+
+```{r}
+#| include: false
+knitr::opts_chunk$set(error = TRUE) #allow some execution errors for demonstration purposes
+knitr::opts_chunk$set(eval = TRUE, echo = TRUE, warning = FALSE, collapse = TRUE, comment = "#>")
+sessionInfo()
+library(bibliometrix)	
+library(tidyverse)
+library(stringr)
+library(knitr)
+library(forcats)
+library(ggplot2)
+library(ggthemes) #for ggplot2
+library(hrbrthemes)  #for ggplot2
+library(bibliometrix)
+#library(igraph) # for more advanced networks
+#library(patchwork) # for multi-panel figures
+library(RColorBrewer)
+library(wordcloud2)
+library(migest)
+library(circlize)
+```
+
+```{r}
+bib <- convert2df("E:/Desktop/scopus.bib", dbsource = "scopus", format = "bibtex") # Convert to a bibliometric data frame
+names(bib)
+#write.csv(bib, "data/bib_as_df.csv", row.names = FALSE) #if you want to save this data frame as a csv file
+```
+
+```{r}
+screened <- read.csv("E:/Desktop/articles.csv")
+names(screened) #you can see there are fewer columns in the exported file
+dim(screened) #note that many fields get collapsed into the "notes" field
+
+#screened$notes[1] #contains export info, decisions and labels at the end 
+
+#extract record labels from notes column - i.e. string after "RAYYAN-INCLUSION: "
+screened$decisions_labels <- sub(".*RAYYAN-INCLUSION: ", "", screened$notes)
+screened$decisions_labels[1:10] #some have labels
+
+#filter out (remove) rows that contain the string 'Excluded' ' in the decisions_labels column:
+screened %>% filter(!grepl('Excluded', decisions_labels)) -> screened_included
+dim(screened_included) #350 records now - only included ones
+
+#extract record labels from decisions_labels column - i.e. string after "RAYYAN-LABELS: "
+screened_included$labels <- sub(".*RAYYAN-LABELS: ", "", screened_included$decisions_labels)
+
+#see what values are there per record:
+table(screened_included$labels) #some dont have labels: {"Losia"=>"Included"}
+
+screened_included$labels <- gsub('\\{"Losia"=>"Included"\\}', 'no labels', screened_included$labels) #replacing with new label "no labels", NOTE: instead, we could remove these records from analyses
+
+dim(screened_included) #345 records
+screened_included %>% filter(grepl('scopus', url)) %>% nrow() # 342 records from Scopus have doi contained in their url string: screened_included$url
+```
+
+```{r}
+#before joining by title, need to tidy up titles
+
+# Removing all punctuation and extra white spaces in bib object, in order to compare dataframes by Title:
+bib$TI2 <- str_replace_all(bib$TI,"[:punct:]","") %>% str_replace_all(.,"[ ]+", " ") 
+
+# Remove all punctuation and extra white spaces in screened_included object, in order to compare dataframes by Title:
+screened_included$TI2 <- str_to_upper(str_replace_all(screened_included$title,"[:punct:]","")) %>% str_replace_all(.,"[ ]+", " ")
+
+# The field 'TI2' will now be used for merging info from onto bib data frame
+bib_title <- left_join(bib, screened_included %>% dplyr::select(url, title, TI2, year, journal, labels), by = "TI2")
+table(is.na(bib_title$labels)) #346 records with labels, these were included in Rayyan
+
+#only keep rows with labels
+bib_title %>% filter(!is.na(labels)) -> bib_title_included
+dim(bib_title_included) #346 records included
+table(bib_title_included$labels) 
+names(bib_title_included) #now we have bibliometric file with only included articles and with labels
+```
+
+```{r}
+authors <- bib$AU
+authors <- unlist(strsplit(authors, ";"))
+authors <- authors[order(authors)]
+head(authors)
+```
+
+```{r}
+results <- biblioAnalysis(bib_title_included, sep = ";")
+summary(object = results, k = 10, pause = TRUE) #display a series of summary tables
+
+dim(bib_title_included)
+```
+
+```{r}
+# Preliminary descriptive analyses using summary function
+results <- biblioAnalysis(bib_title_included, sep = ";")
+#summary(object = results, k = 10, pause = TRUE) #display a series of summary tables
+plot(results, k = 10, pause = TRUE) #this takes top 10 values from each table
+```
+
+```{r}
+#create Field variable
+bib_title_included <- bib_title_included %>%          
+         mutate(Environmental_Governance = case_when(str_detect(labels, "Environmental Governance") ~ "Environmental Governance", #just Environmental Governance
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Environmental_Governance)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Aquatic_Ecosystems = case_when(str_detect(labels, "Aquatic Ecosystems") ~ "Aquatic Ecosystems", #just Aquatic Ecosystems
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Aquatic_Ecosystems)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Environmental_Accounting = case_when(str_detect(labels, "Environmental Accounting") ~ "Environmental Accounting", #just Environmental Accounting
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Environmental_Accounting)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Agriculture = case_when(str_detect(labels, "Agriculture") ~ "Agriculture", #just Agriculture
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Agriculture)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(TNEB = case_when(str_detect(labels, "Terrestrial Natural Ecosystems and Biodiversity") ~ "Terrestrial Natural Ecosystems and Biodiversity", #just Terrestrial Natural Ecosystems and Biodiversity
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$TNEB)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Economics_Social = case_when(str_detect(labels, "Economics and Social") ~ "Economics and Social", #just Economics and Social
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Economics_Social)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Big_Data = case_when(str_detect(labels, "Big Data") ~ "Big Data", #just Big Data
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Big_Data)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Health = case_when(str_detect(labels, "Health") ~ "Health", #just Health
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Health)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Energy = case_when(str_detect(labels, "Energy") ~ "Energy", #just Energy
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Energy)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Atmospheric_Science = case_when(str_detect(labels, "Atmospheric Science") ~ "Atmospheric Science", #just Atmospheric Science
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Atmospheric_Science)
+
+bib_title_included <- bib_title_included %>%          
+         mutate(Other = case_when(str_detect(labels, "Other") ~ "Other", #just Other
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Other)
+```
+
+```{r}
+#create Areas variable
+bib_title_included <- bib_title_included %>%          
+         mutate(Areas = case_when(str_detect(labels, "International") ~ "International", 
+                               str_detect(labels, "Developed Areas" ) ~ "Developed Areas", 
+                               str_detect(labels, "Developing Areas" ) ~ "Developing Areas", 
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Areas)
+```
+
+```{r}
+#create Solution variable
+bib_title_included <- bib_title_included %>%          
+         mutate(Solution = case_when(str_detect(labels, "solution") ~ "solution", 
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Solution)
+
+#create Solution-Policy variable
+bib_title_included <- bib_title_included %>%          
+         mutate(Policy = case_when(str_detect(labels, "Policy" ) ~ "Policy", 
+                               TRUE ~ "unclear")) #some will have none and we leave them as "unclear"
+names(bib_title_included)
+table(bib_title_included$Policy)
+
+table(bib_title_included$Solution, bib_title_included$Policy)
+```
+
+```{r}
+data <- data.frame(
+  Category = c("Solution", "Unclear"),
+  Count = c(152, 80)
+)
+
+# Calculate percentages for each category
+data$Percent <- data$Count / sum(data$Count) * 100
+
+# Create the bar plot
+ggplot(data, aes(x = paste0(Percent, "%"), y = Count, fill = Category)) +
+  geom_col(position = "dodge", width = 0.5) +
+  geom_text(aes(label = Count), vjust = -0.5, size = 4, position = position_dodge(width = 0.5)) +
+  labs(title = "Solution",
+       x = "Percent",
+       y = "Count")
+```
+
+```{r}
+# Sample data (replace this with your actual data)
+data <- data.frame(
+  Category = c("Policy", "Unclear"),
+  Count = c(142, 90)
+)
+
+# Calculate percentages for each category
+data$Percent <- data$Count / sum(data$Count) * 100
+
+# Create the bar plot
+ggplot(data, aes(x = paste0(Percent, "%"), y = Count, fill = Category)) +
+  geom_col(position = "dodge", width = 0.5) +
+  geom_text(aes(label = Count), vjust = -0.5, size = 4, position = position_dodge(width = 0.5)) +
+  labs(title = "Policy",
+       x = "Percent",
+       y = "Count")
+```
+
+```{r}
+# Calculate the count of each area
+area_counts <- table(bib_title_included$Areas)
+
+# Calculate percentages for each area
+area_percentages <- prop.table(area_counts) * 100
+
+area_colors <- c("#0072B2", "#009E73", "#56B4E9", "#3F48CC")
+
+labels_with_percentages <- sprintf("%s (%.1f%%)", names(area_counts), area_percentages)
+pie(area_counts, main = "Distribution of Areas", col = area_colors, labels = labels_with_percentages)
+
+```
+
+```{r}
+# Combine all 12 fields into a single column and remove "unclear" values
+bib_title_included_long <- bib_title_included %>%
+  pivot_longer(cols = c(Environmental_Governance, Aquatic_Ecosystems, Environmental_Accounting, Agriculture, TNEB, Economics_Social, 
+                        Big_Data, Health, Energy, Atmospheric_Science, Other),
+               names_to = "Research_Field", values_to = "Category") %>%
+  filter(Category != "unclear")
+
+# Plot the histogram
+ggplot(bib_title_included_long, aes(x = Research_Field, fill = Category )) +
+  geom_bar(position = "dodge", stat = "count", show.legend = TRUE) +
+  labs(title = "Research Field",
+       x = "Field",
+       y = "Article count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+bib_title_included %>%
+  pivot_longer(cols = c(Environmental_Governance, Aquatic_Ecosystems, Environmental_Accounting, Agriculture, TNEB, Economics_Social, 
+                        Big_Data, Health, Energy, Atmospheric_Science, Other),
+               names_to = "Research_Field", values_to = "Category") %>%
+  filter(Category != "unclear") %>%
+  count(year, Research_Field, Category) %>%
+  ggplot(aes(x = year, y = n, color = Research_Field)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_color_manual(values = c("blue","#1f78b4","green","#fdbf6f","#33a02c","red","#EE1289","#274088","black","#CD5B45","#9A32CD")) +
+  theme_classic() +
+  labs(x = "Year", y = "Article count", color = "Research Field") +
+  theme(legend.position = "right", axis.title.x = element_text(size = 10))
+```
+
+```{r}
+my_colors <- c("lightcyan","lightblue", "powderblue", "lightskyblue", "lightsteelblue", "royalblue1",
+               "skyblue2", "slategray1", "steelblue4", "snow3", "slategray")
+
+bib_title_included %>%
+  pivot_longer(cols = c(Environmental_Governance, Aquatic_Ecosystems, Environmental_Accounting, Agriculture, TNEB, Economics_Social, Big_Data, Health, Energy, 
+                        Atmospheric_Science, Other),
+               names_to = "Research_Field", values_to = "Category") %>%
+  filter(Category != "unclear") %>%
+  count(Category) %>%
+  mutate(Percentage = n / sum(n)) %>%
+  ggplot(aes(x = "", y = Percentage, fill = Category)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  labs(title = "Percentage Distribution of Article Counts by Category", fill = "Category") +
+  theme(legend.position = "right") +
+  scale_fill_manual(values = my_colors) +
+  geom_text(aes(label = scales::percent(Percentage)), position = position_stack(vjust = 0.5))
+```
+
+```{r}
+bib2 <- biblioAnalysis(bib_title_included, sep = ";")
+S <- summary(object = bib2, k = 80, pause = FALSE) #only top 80 keywords
+keywords <- S$MostRelKeywords #exract single vector with most relevant keywords
+words <- keywords[, 1] #only using Author Keywords (DE) 
+freq <- as.numeric(keywords[, 2]) #vector of keyword frequencies for Author Keywords (DE) 
+prob <- freq/sum(freq)
+
+#words <- keywords[, 3] #only using Keywords-Plus (ID) 
+#freq <- as.numeric(keywords[, 4]) #vector of keyword frequencies for Keywords-Plus (ID) 
+#prob <- freq/sum(freq)
+
+wordcloud2(data.frame(words, prob), shuffle = TRUE, size = 1.5, color = "random-dark") 
+```
+
+```{r}
+#using a bit different approach to get countries out
+bib3 <- metaTagExtraction(bib_title_included, Field = "AU_CO", sep = ";")
+NetMatrix <- biblioNetwork(bib3, analysis = "collaboration", network = "countries", sep = ";") #this extracts all sort of stuff
+results <- biblioAnalysis(bib3, sep = ";")
+
+S2 <- summary(object = results, k = 8, pause = FALSE) #only using top 10 countries
+MostProdCountries <- S2$MostProdCountries
+MostProdCountries$Articles <- as.numeric(MostProdCountries$Articles) #counts as numeric values
+Countries <- MostProdCountries[1:8, "Country"] #trim again to top 10, could change this to smaller number if needed
+Countries <- trimws(Countries) #trim white space after country name
+net_matrix <- as.matrix(NetMatrix) #convert to matrix
+str(net_matrix)
+intersect(rownames(net_matrix), Countries)
+setdiff(rownames(net_matrix), Countries)
+setdiff(Countries, rownames(net_matrix))
+small_matrix <- net_matrix[Countries, Countries]
+diag(small_matrix) <- 0  #get rid of collaboration with same country
+
+circos.clear() #prepare plotting area
+chordDiagramFromMatrix(small_matrix) #make the plot
+```
+
+```{r}
+# Extract country information from the "AU_CO" 
+bibmap <- metaTagExtraction(bib_title_included, Field = "AU_CO", sep = ";") 
+bibmap <- metaTagExtraction(bibmap, Field = "AU_CO", sep = ";") #just getting the countries out of affiliations
+#table(bibmap$AU_CO) 
+
+# Create a data frame with counts of articles from each country
+bibmap %>% 
+  group_by(AU_CO) %>%  
+  count() %>% 
+  filter(!is.na(AU_CO)) -> firstcountrycounts
+
+firstcountrycounts
+
+# Load world map data and remove countries with longitude >180 to make an equal projection-like map
+world_map <- map_data("world") %>% 
+  filter(! long > 180)
+
+str(world_map)
+unique(world_map$region)
+
+# Format country names to match regions on the world map
+firstcountrycounts$region <- str_to_title(firstcountrycounts$AU_CO)
+firstcountrycounts$region[firstcountrycounts$region == "Usa"] <- "USA";
+firstcountrycounts$region[firstcountrycounts$region == "UNITED KINGDOM"] <- "UNITED KINGDOM";
+firstcountrycounts$region[firstcountrycounts$region == "AUSTRALIA"] <- "AUSTRALIA";
+firstcountrycounts$region[firstcountrycounts$region == "NETHERLANDS"] <- "NETHERLANDS";
+
+
+unique_characters <- unique(firstcountrycounts$region)
+print(unique_characters)
+
+# Join count data with map data and set missing counts to zero
+emptymap <- tibble(region = unique(world_map$region), n = rep(0,length(unique(world_map$region))))
+fullmap <- left_join(emptymap, firstcountrycounts, by = "region")
+fullmap$n <- fullmap$n.x + fullmap$n.y
+fullmap$n[is.na(fullmap$n)] <- 0
+
+emptymap
+```
+
+```{r}
+library(ggplot2)
+
+# Assuming you have already loaded the required data and packages
+# fullmap <- ... (your data preparation)
+# world_map <- ... (your world map data)
+
+fullmap %>% 
+  ggplot(aes(fill = n, map_id = region)) +
+  geom_map(map = world_map, color = "white", size = 0.1) +  # Adding white borders around regions
+  expand_limits(x = world_map$long, y = world_map$lat) +
+  coord_map("moll") + # Mollweide projection
+  scale_fill_gradient(low = "#63B8FF", high = "#FF6A6A", na.value = "gray", name = "Value", breaks = c(50, 100, 150, 200, 250, 300)) +  # Customize gradient colors and set breaks
+  guides(fill = guide_colourbar(title = "Legend Title")) +  # Add a title to the color scale legend
+  theme_map() +  # Using a simple theme for the map
+  labs(title = "World Map Showing Most Productive Countries",
+       subtitle = "2000-2023",
+       caption = "Data Source: Scopus") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.title = element_text(size = 15, face = "bold"),
+        legend.text = element_text(size = 8),
+        panel.background = element_rect(fill = "transparent", colour = NA),  # Setting white background
+        plot.background = element_rect(fill = "transparent", colour = NA))
+```
+

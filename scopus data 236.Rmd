@@ -1,0 +1,45 @@
+---
+title: "scopus"
+output: html_document
+date: "2023-07-14"
+---
+
+```{r}
+install.packages("bibliometrix", dependencies=TRUE)
+library(bibliometrix)
+```
+```{r}
+bib <-convert2df("E:/Desktop/scopus.bib", dbsource = "scopus", format = "bibtex") 
+dim(bib) #dimensions of the data frame
+names(bib) #names of the columns of the data frame
+```
+
+
+```{r}
+results <- biblioAnalysis(bib, sep = ";")
+bib <- bib[1:236, ] 
+plot(results, k = 20, pause=TRUE)
+```
+
+```{r}
+NetMatrix <- biblioNetwork(bib, analysis = "collaboration", network = "authors", sep = ";")
+net <- networkPlot(NetMatrix, weighted = NULL, n = 20, Title = "Authors' collaborations", type = "fruchterman", size = 5, remove.multiple = TRUE, labelsize = 0.5)
+```
+```{r}
+bib <- metaTagExtraction(bib, Field = "AU_CO", sep = ";") #we need to extract countries from the affiliations first
+NetMatrix <- biblioNetwork(bib, analysis = "collaboration", network = "countries", sep = ";")
+net <- networkPlot(NetMatrix, n = 30, Title = "Country Collaboration", type = "auto", size = TRUE, remove.multiple = FALSE, labelsize = 0.5)
+```
+```{r}
+NetMatrix <- biblioNetwork(bib, analysis = "co-occurrences", network = "keywords", sep = ";")
+net <- networkPlot(NetMatrix, n = 20, Title = "Keyword co-occurance", type = "fruchterman", size = T, remove.multiple = FALSE, labelsize = 0.7, edgesize = 5)
+```
+```{r}
+CS <- conceptualStructure(bib, field = "ID", minDegree = 20, k.max = 5, stemming = FALSE, labelsize = 10)
+```
+
+
+
+
+
+
